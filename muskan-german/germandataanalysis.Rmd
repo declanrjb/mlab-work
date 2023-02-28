@@ -1,0 +1,114 @@
+---
+title: "Data Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(pacman)
+pacman::p_load(tidyr, dplyr)
+```
+
+#Importing German Data 
+
+```{r germany}
+germany <- read.csv("Documents/R/mlab-work/muskan-german/germany_data.csv")
+germany[germany$year != "2018",] 
+germany <-germany[!(germany$year=="2018"),]
+
+```
+
+```{r germany}
+#summary stats
+remove_mstat <- c(-1,-2, -3, -4,-5,-6,-7)
+germany$Marital.Status <- ifelse(germany$Marital.Status %in% remove_mstat, "NA", germany$Marital.Status) 
+germany <- germany %>%
+  mutate(Marital.Status = case_when(
+     Marital.Status == 1 | Marital.Status == 2 | Marital.Status == 6 ~ "MARRIED/MARRIED BUT LIVING APART",
+    Marital.Status == 3 | Marital.Status == 4 | Marital.Status == 5 ~ "SEPARATED/DIVORCED/WIDOWED",
+    Marital.Status == 7 | Marital.Status == 8 ~ "registered same sex partnership "
+  ))
+
+# removing `Occupational.Change` and the duplicate rows
+to_delete <- seq(1, nrow(germany), 2)
+germany_new <- germany[to_delete,] # this removes every other row
+
+germany_new <- germany_new %>% select(-Occupational.Change)
+
+# marital status counts
+maritalstat_counts <- germany_new %>%
+  # if you want to remove NAs:
+  # filter(!is.na(Marital.Status)) %>% 
+  group_by(year) %>%
+  count(Marital.Status)
+
+# college degree counts
+collegedeg_counts <- germany_new %>% 
+  mutate(College.Degree = as.character(College.Degree)) %>% 
+  group_by(year) %>% 
+  count(College.Degree)
+
+# mean gross income
+mean_income <- germany_new %>% 
+  filter(Gross.Labor.Income >= 0) %>% 
+  group_by(year) %>% 
+  summarize(mean = mean(Gross.Labor.Income))
+
+```
+
+```{r}
+germany_test <- germany_new %>% 
+  filter(Length.of.time.within.firm > 0) %>%
+  mutate(occ_change = case_when(
+    Length.of.time.within.firm > lag(Length.of.time.within.firm) ~ "No",
+    Length.of.time.within.firm < lag(Length.of.time.within.firm) ~ "Yes"
+  )) %>% 
+  select(pid, year, occ_change, Length.of.time.within.firm)
+
+occ_change_counts <- germany_test %>% 
+  group_by(year) %>% 
+  count(occ_change)
+```
+
+
+## To do: Check reasons for occupational change: Where does the replicated column come from in the merging process?
+## What is the difference between NA and -2 (in wage)
+## Check NAs: where do they occur? and are they really missing values? and what to do about them (keep? or drop?)
+
+```{r}
+# install.packages("stargazer")
+library(stargazer)
+# install.packages("kableExtra")
+library(kableExtra)
+
+usa <- read.csv("~/R/mLab/muskan/usa_data.csv")
+
+usa_summary <- usa %>% 
+  summarize(mean_hrly = mean(HRLY, na.rm = TRUE),
+            mean_children = mean(Children, na.rm = TRUE),
+            mean_age = mean(age, na.rm = TRUE)
+            )
+
+
+
+usa_summary %>% 
+  kbl() %>% 
+  kable_classic()
+```
+
+
+
+```{r usdata}
+usa_summary <- read.csv("~/R/mLab/muskan/usa_summary.csv") %>% 
+  select(1:2)
+
+usa_fixed <- usa_summary[usa_summary == ""] <- NA
+
+usa_wide <- usa_summary %>% 
+  filter(!is.na(X)) %>% 
+  tidyr::pivot_wider(names_from = "X",
+              values_from = "Observations")
+```
+
+
+
